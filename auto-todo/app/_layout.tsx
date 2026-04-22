@@ -1,24 +1,43 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { useEffect } from 'react';
+import { initDb } from '@/lib/database';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    initDb();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <>
       <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'Today',
+            headerLargeTitle: true,
+            headerStyle: { backgroundColor: '#FFFFFF' },
+            headerTintColor: '#000000',
+          }}
+        />
+        <Stack.Screen
+          name="habit/[id]"
+          options={{
+            headerStyle: { backgroundColor: '#FFFFFF' },
+            headerTintColor: '#000000',
+            headerBackTitle: 'Today',
+          }}
+        />
+        <Stack.Screen
+          name="habit-modal"
+          options={{
+            presentation: 'modal',
+            headerStyle: { backgroundColor: '#FFFFFF' },
+            headerTintColor: '#000000',
+          }}
+        />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style="dark" />
+    </>
   );
 }
