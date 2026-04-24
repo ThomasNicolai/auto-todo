@@ -1,110 +1,59 @@
-import * as SQLite from 'expo-sqlite';
+import { supabase } from "@/utils/supabase";
 
-export type Habit = {
-  id: number;
-  name: string;
+export type Todo = {
+  id: string;
+  user_id: string;
+  title: string;
+  completed: boolean;
   created_at: string;
 };
 
-export type Completion = {
-  id: number;
-  habit_id: number;
-  date: string;
-};
-
-let db: SQLite.SQLiteDatabase | null = null;
-
-function getDb(): SQLite.SQLiteDatabase {
-  if (!db) {
-    db = SQLite.openDatabaseSync('habits.db');
-  }
-  return db;
+export async function getTodos(): Promise<Todo[]> {
+  const { data, error } = await supabase
+    .from("todos")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }
 
-export function initDb(): void {
-  const database = getDb();
-  database.execSync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-
-    CREATE TABLE IF NOT EXISTS habits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS completions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      habit_id INTEGER NOT NULL,
-      date TEXT NOT NULL,
-      UNIQUE(habit_id, date),
-      FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE
-    );
-  `);
+export async function getTodo(id: string): Promise<Todo | null> {
+  const { data, error } = await supabase
+    .from("todos")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) return null;
+  return data;
 }
 
-export function getAllHabits(): Habit[] {
-  return getDb().getAllSync<Habit>(
-    'SELECT id, name, created_at FROM habits ORDER BY created_at ASC, id ASC'
-  );
+export async function insertTodo(title: string): Promise<Todo> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const { data, error } = await supabase
+    .from("todos")
+    .insert({ title, user_id: session!.user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-export function getHabit(id: number): Habit | null {
-  return getDb().getFirstSync<Habit>(
-    'SELECT id, name, created_at FROM habits WHERE id = ?',
-    [id]
-  );
+export async function updateTodoTitle(id: string, title: string): Promise<void> {
+  const { error } = await supabase.from("todos").update({ title }).eq("id", id);
+  if (error) throw error;
 }
 
-export function insertHabit(name: string): number {
-  const today = new Date().toISOString().split('T')[0];
-  const result = getDb().runSync(
-    'INSERT INTO habits (name, created_at) VALUES (?, ?)',
-    [name, today]
-  );
-  return result.lastInsertRowId;
+export async function toggleTodo(id: string, completed: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("todos")
+    .update({ completed })
+    .eq("id", id);
+  if (error) throw error;
 }
 
-export function updateHabit(id: number, name: string): void {
-  getDb().runSync('UPDATE habits SET name = ? WHERE id = ?', [name, id]);
-}
-
-export function deleteHabit(id: number): void {
-  getDb().runSync('DELETE FROM habits WHERE id = ?', [id]);
-}
-
-export function getCompletionsForHabit(habitId: number): Completion[] {
-  return getDb().getAllSync<Completion>(
-    'SELECT id, habit_id, date FROM completions WHERE habit_id = ? ORDER BY date ASC',
-    [habitId]
-  );
-}
-
-export function getCompletionsForDate(date: string): Completion[] {
-  return getDb().getAllSync<Completion>(
-    'SELECT id, habit_id, date FROM completions WHERE date = ?',
-    [date]
-  );
-}
-
-export function toggleCompletion(habitId: number, date: string): void {
-  const database = getDb();
-  const result = database.runSync(
-    'INSERT OR IGNORE INTO completions (habit_id, date) VALUES (?, ?)',
-    [habitId, date]
-  );
-  if (result.changes === 0) {
-    database.runSync(
-      'DELETE FROM completions WHERE habit_id = ? AND date = ?',
-      [habitId, date]
-    );
-  }
-}
-
-export function isCompleted(habitId: number, date: string): boolean {
-  const row = getDb().getFirstSync<{ cnt: number }>(
-    'SELECT COUNT(*) as cnt FROM completions WHERE habit_id = ? AND date = ?',
-    [habitId, date]
-  );
-  return (row?.cnt ?? 0) > 0;
+export async function deleteTodo(id: string): Promise<void> {
+  const { error } = await supabase.from("todos").delete().eq("id", id);
+  if (error) throw error;
 }
