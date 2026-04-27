@@ -2,8 +2,24 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Linking from "expo-linking";
 import { useEffect } from "react";
-import { Text, TouchableOpacity } from "react-native";
-import { supabase } from "@/utils/supabase";
+import { NativeModules, Platform, Text, TouchableOpacity } from "react-native";
+import { supabase, supabaseUrl, supabasePublishableKey } from "@/utils/supabase";
+
+function saveWidgetCredentials(accessToken: string): void {
+  if (Platform.OS === "android") {
+    NativeModules.TodoWidgetBridge?.saveCredentials(
+      supabaseUrl,
+      supabasePublishableKey,
+      accessToken,
+    );
+  }
+}
+
+function clearWidgetCredentials(): void {
+  if (Platform.OS === "android") {
+    NativeModules.TodoWidgetBridge?.clearCredentials();
+  }
+}
 
 function SignOutButton() {
   return (
@@ -48,8 +64,14 @@ export default function RootLayout() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
+        saveWidgetCredentials(session.access_token);
         router.replace("/");
+      } else if (event === "INITIAL_SESSION" && session) {
+        saveWidgetCredentials(session.access_token);
+      } else if (event === "TOKEN_REFRESHED" && session) {
+        saveWidgetCredentials(session.access_token);
       } else if (event === "SIGNED_OUT") {
+        clearWidgetCredentials();
         router.replace("/sign-in");
       }
     });
